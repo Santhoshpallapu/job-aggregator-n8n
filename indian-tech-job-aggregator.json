@@ -1,0 +1,195 @@
+{
+  "name": "Indian Tech Job Aggregator & Daily Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": [
+          {
+            "mode": "everyDay",
+            "hour": 9,
+            "minute": 0
+          }
+        ]
+      },
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.adzuna.com/v1/api/jobs/in/search/1",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "app_id",
+              "value": "YOUR_APP_ID"
+            },
+            {
+              "name": "app_key",
+              "value": "YOUR_APP_KEY"
+            },
+            {
+              "name": "results_per_page",
+              "value": "50"
+            },
+            {
+              "name": "sort_by",
+              "value": "date"
+            },
+            {
+              "name": "what",
+              "value": "software developer OR python OR java OR full stack OR devops OR data engineer"
+            },
+            {
+              "name": "where",
+              "value": "india"
+            }
+          ]
+        }
+      },
+      "name": "Adzuna API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => {\n  return {\n    json: {\n      Job_Title: item.json.title,\n      Company: item.json.company.display_name,\n      Location: item.json.location.display_name,\n      Category: item.json.category.label,\n      Posted_Date: item.json.created,\n      Salary: (item.json.salary_min && item.json.salary_max) ? `${item.json.salary_min} - ${item.json.salary_max}` : \"Not specified\",\n      URL: item.json.redirect_url\n    }\n  }\n});"
+      },
+      "name": "Format for Sheets",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "sheetId": "YOUR_SHEET_ID",
+        "range": "Sheet1!A:G"
+      },
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const jobs = items.slice(0, 15);\nlet text = \"\ud83d\udce2 Top Tech Jobs in India:\\n\\n\";\njobs.forEach((item, i) => {\n  const job = item.json;\n  text += `${i+1}. ${job.Job_Title} \u2013 ${job.Company}\\nLocation: ${job.Location}\\nDate: ${job.Posted_Date}\\nApply: ${job.URL}\\n\\n`;\n});\nreturn [{json: {message: text}}];"
+      },
+      "name": "Top 15 Formatter",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        750,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "to": "YOUR_EMAIL@gmail.com",
+        "subject": "Daily Top Tech Jobs in India",
+        "text": "={{$json[\"message\"]}}"
+      },
+      "name": "Send Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "postMessage",
+        "channel": "#jobs",
+        "text": "={{$json[\"message\"]}}"
+      },
+      "name": "Send Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        700
+      ]
+    }
+  ],
+  "connections": {
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Adzuna API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adzuna API": {
+      "main": [
+        [
+          {
+            "node": "Format for Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format for Sheets": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Top 15 Formatter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Top 15 Formatter": {
+      "main": [
+        [
+          {
+            "node": "Send Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "id": "123",
+  "versionId": "1"
+}
